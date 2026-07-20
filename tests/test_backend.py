@@ -1,8 +1,13 @@
 import os
+import sys
 import unittest
 import unittest.mock
 import numpy as np
 import sqlite3
+
+# Dynamically add the 'src' directory to Python Path to resolve modules correctly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+
 import storage
 from recognizer import SFRecognizer
 from app import app

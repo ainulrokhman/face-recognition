@@ -28,11 +28,13 @@ RUN mkdir -p /app/data /app/dataset && chown -R appuser:appuser /app
 # Switch to the non-root user
 USER appuser
 
-# Copy python core modules, playground assets, docs, and tests with correct ownership
-COPY --chown=appuser:appuser interfaces.py detector.py recognizer.py storage.py app.py index.html docs.html test_backend.py /app/
+# Copy python core modules, static assets, and tests with correct ownership
+COPY --chown=appuser:appuser src/ /app/src/
+COPY --chown=appuser:appuser static/ /app/static/
+COPY --chown=appuser:appuser tests/ /app/tests/
 
 # Expose the port Flask runs on
 EXPOSE 5000
 
 # Run the Flask application
-CMD ["python", "app.py"]
+CMD ["python", "src/app.py"]

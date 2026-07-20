@@ -9,7 +9,7 @@ from detector import YuNetDetector
 from recognizer import SFRecognizer
 
 # Initialize Flask application
-app = Flask(__name__, static_folder=".", template_folder=".")
+app = Flask(__name__, static_folder="static")
 
 # Initialize SQLite database schema
 storage.init_db()
@@ -58,12 +58,12 @@ def handle_options(path):
 @app.route("/")
 def index():
     """Serves the test playground HTML file."""
-    return send_from_directory(".", "index.html")
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.route("/docs")
 def docs():
     """Serves the production API documentation portal."""
-    return send_from_directory(".", "docs.html")
+    return send_from_directory(app.static_folder, "docs.html")
 
 @app.route("/status", methods=["GET"])
 def get_status():
