@@ -33,8 +33,11 @@ COPY --chown=appuser:appuser src/ /app/src/
 COPY --chown=appuser:appuser static/ /app/static/
 COPY --chown=appuser:appuser tests/ /app/tests/
 
+# Copy pre-downloaded ONNX models to prevent runtime downloads
+COPY --chown=appuser:appuser data/*.onnx /app/data/
+
 # Expose the port Flask runs on
 EXPOSE 5000
 
-# Run the Flask application
-CMD ["python", "src/app.py"]
+# Run the Flask application using Gunicorn with 4 workers for production-grade concurrency
+CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:5000", "--pythonpath", "src", "app:app"]

@@ -1,142 +1,208 @@
-# Face Recognition Backend API (OpenCV DNN + SFace)
+# Face Recognition API (Production Ready)
 
-A high-performance, containerized, and memory-optimized **Face Recognition REST API** built with Flask, OpenCV's deep learning module, and SQLite.
+A high-performance, containerized, and secure **Face Recognition REST API** built with Flask, OpenCV's DNN module, SQLite, and Nginx. 
 
-Designed for production environments to handle student attendance systems with thousands of records, using state-of-the-art CNN models:
-- **YuNet CNN**: Dynamic input face detection and landmark extraction.
+This service implements a state-of-the-art biometric pipeline utilizing:
+- **YuNet CNN**: Real-time face detection, landmark localization, and head pose estimation.
 - **SFace**: 128-dimensional biometric embedding extraction.
-- **SQLite3**: Relational persistence of student profiles and serialized vectors.
-- **NumPy**: Vectorized Cosine Similarity matching (<0.5ms search time).
+- **SQLite3 (WAL Mode)**: Relational storage of student profiles and serialized vectors.
+- **In-Memory Cache (Version-controlled)**: Super-fast vector similarity matching (<0.5ms) across multiple WSGI workers.
 
 ---
 
-## Architectural & Production Features
+## 🏗️ Production Architecture
 
-### 1. Biometric Pipeline
-- **Quality Filter**: Rejects blurry, poorly lit, or out-of-focus frames during registration (YuNet confidence threshold $\ge 80\%$).
-- **Pose Verification**: Real-time left, right, and front head pose validation using landmarks ratios to build a complete 3D profile.
-- **Deduplication**: Biometric check preventing registering the same face under multiple student IDs.
+```
+                       [ HTTPS (8443) ]          [ HTTP (8080) ]
+                              │                        │
+                              ▼                        ▼
+                      ┌───────────────┐        ┌───────────────┐
+                      │  Nginx Proxy  │◄───────│  Redirect 301 │
+                      └───────┬───────┘        └───────────────┘
+                              │ (Internal HTTP)
+                              ▼
+                      ┌───────────────┐
+                      │ Gunicorn WSGI │ (4 workers, direct access on 5000)
+                      └───────┬───────┘
+                              │
+             ┌────────────────┼────────────────┐
+             ▼                ▼                ▼
+     ┌───────────────┐┌───────────────┐┌───────────────┐
+     │  YuNet (CNN)  ││ SFace (ONNX)  ││ SQLite (WAL)  │
+     │  Face Detect  ││ Feature Extr  ││  Vector DB   │
+     └───────────────┘└───────────────┘└───────────────┘
+```
 
-### 2. Deployment Security
-- **Container Hardening**: Execution under a non-root system user (`appuser` with UID/GID 1000) inside the Docker container.
-- **HTTPS/SSL**: Nginx reverse proxy with SSL termination, HSTS, and security headers (`X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`).
-- **Access Authentication**: Bearer-token authentication using the `X-API-Key` request header.
-- **CORS Restriction**: Configurable allowed origin header mapping.
-
-### 3. Scalability
-- **Smart Cache Sync**: In-memory embedding cache with SQLite WAL + version-based invalidation. Each request checks a single integer (~5μs overhead) — auto-reloads only when data changes. Safe for multi-worker deployment (Gunicorn/uWSGI).
-- **Dual Input Support**: API endpoints accept both `multipart/form-data` (binary file upload, ~33% less bandwidth) and `application/json` (Base64 string) — auto-detected from `Content-Type`.
-- **Zero Retraining**: Adding a new user is instant and requires no model training (unlike LBPH/Eigenfaces).
-
----
-
-## Project Structure
-
-- `src/`: Core Python backend source code.
-  - `app.py`: Main Flask REST API server and security hooks.
-  - `detector.py`: YuNet CNN detector wrapper, landmark locator, and pose classifier.
-  - `recognizer.py`: SFace ONNX feature extractor and Cosine similarity math.
-  - `storage.py`: SQLite Database CRUD actions, WAL mode, and cache version management.
-  - `cache.py`: Version-based embedding cache with auto-invalidation for multi-worker sync.
-  - `image_utils.py`: Dual-input image parser (multipart file upload + JSON Base64).
-  - `interfaces.py`: Clean interfaces separating responsibilities (SOLID).
-- `static/`: Static assets served by Flask.
-  - `index.html`: Client-side webcam interactive sandbox.
-  - `docs.html`: Production-grade API documentation portal (Swagger-style).
-- `tests/`: Automated unit tests.
-  - `test_backend.py`: Automated test cases (security, boundaries, math, CRUD, multipart, cache).
-- `nginx/`: Nginx reverse proxy configuration.
-  - `nginx.conf`: SSL termination, security headers, and proxy settings.
-  - `generate-cert.sh`: Self-signed certificate generator for development.
-- `docker-compose.yml` & `Dockerfile`: Package orchestration for deployments.
+### Key Production Enhancements
+1. **High Concurrency**: Powered by **Gunicorn** WSGI server with 4 worker threads for reliable concurrent processing.
+2. **Reverse Proxy & SSL**: Protected by an **Nginx Alpine** container providing SSL/TLS termination, HTTP→HTTPS redirects, and strict security headers (`HSTS`, `X-Frame-Options`, `X-Content-Type-Options`).
+3. **Smart Cache Synchronization**: Uses a custom **SQLite WAL + Version-based counter** for cross-worker memory invalidation. Each worker checks a single database integer (~5μs overhead) before reusing its local memory cache, ensuring data consistency without the overhead of a Redis container.
+4. **Dual Input Methods**: Endpoints automatically parse both `multipart/form-data` (binary file upload, ~33% bandwidth saving) and `application/json` (Base64 string).
+5. **Baked Weights**: YuNet and SFace model weights are baked into the Docker image, preventing internet-dependent startup failures in isolated networks (VPC).
 
 ---
 
-## Quick Start
+## 📁 Directory Structure
 
-### 1. Configure Environments
-Copy the environment template file:
+```
+├── data/                  # SQLite DB and ONNX models (persistent host bind-mount)
+├── dataset/               # Persistent image uploads (optional host bind-mount)
+├── nginx/
+│   ├── nginx.conf         # SSL & proxy routing configuration
+│   └── generate-cert.sh   # Utility script to generate self-signed dev certificates
+├── src/
+│   ├── app.py             # Main Flask application and security hooks
+│   ├── cache.py           # In-memory version-based embedding cache
+│   ├── detector.py        # YuNet face detector and landmark analyzer
+│   ├── recognizer.py      # SFace embedding extractor and cosine similarity matcher
+│   ├── storage.py         # SQLite connection manager and CRUD operations
+│   └── image_utils.py     # Dual-input image parser (multipart & base64 JSON)
+├── tests/
+│   └── test_backend.py    # Suite of 18 integration and unit tests
+├── Dockerfile             # Production multi-stage Flask & Gunicorn image
+└── docker-compose.yml     # Multi-container stack (Flask app + Nginx proxy)
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1. Environment Configurations
+Copy the template configuration file:
 ```bash
 cp .env.example .env
 ```
-Open `.env` and fill in your configurations:
-- `FACE_API_KEY`: API authentication key.
-- `ALLOWED_ORIGIN`: Allowed domain origins for CORS (e.g. `*` for dev, or `https://absensi.sekolah.sch.id` for prod).
+Open `.env` and configure:
+- `FACE_API_KEY`: Strong security key for API access.
+- `ALLOWED_ORIGIN`: Allowed domain origins for CORS restrictions (e.g. `*` or your web portal domain).
 
-### 2. Generate SSL Certificate
-Generate a self-signed certificate for HTTPS (development):
+### 2. Generate Development SSL Certificates
+Before launching the stack, generate a self-signed SSL certificate for development:
 ```bash
 bash nginx/generate-cert.sh
 ```
-> For production, replace the generated files in `nginx/ssl/` with certificates from a trusted CA (Let's Encrypt, Cloudflare, etc.).
+> **Note**: For production environments, replace the files in `nginx/ssl/` with real certificates issued by a trusted CA (e.g., Let's Encrypt, Cloudflare).
 
-### 3. Launch the Application
-Build and run the API containers in detached mode:
+### 3. Start the Stack
+Build and launch the containers in detached mode:
 ```bash
 docker compose up -d --build
 ```
 
-Access points:
-| URL | Description |
-|-----|-------------|
-| `http://localhost:5000/` | Webcam playground (direct Flask, development) |
-| `http://localhost:5000/docs` | API documentation (direct Flask, development) |
-| `https://localhost:8443/` | Webcam playground (via Nginx HTTPS) |
-| `https://localhost:8443/docs` | API documentation (via Nginx HTTPS) |
-| `http://localhost:8080/` | Auto-redirects to HTTPS |
-
-### 4. Run Test Suite
-Execute the automated tests in the isolated Docker container environment:
+### 4. Running Tests
+Run the 18 automated backend test cases within the isolated Docker environment:
 ```bash
 docker compose run --entrypoint "python -m unittest tests/test_backend.py" face-recognition-api
 ```
 
 ---
 
-## API Input Formats
+## 🌐 Endpoint Access Points
 
-All image-accepting endpoints (`/api/detect`, `/api/register`, `/api/recognize`) support two input formats:
-
-### JSON Base64 (Backward Compatible)
-```bash
-curl -X POST http://localhost:5000/api/detect \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_KEY" \
-  -d '{"frame": "data:image/jpeg;base64,/9j/4..."}'
-```
-
-### Multipart File Upload (Saves ~33% Bandwidth)
-```bash
-curl -X POST http://localhost:5000/api/detect \
-  -H "X-API-Key: YOUR_KEY" \
-  -F "image=@photo.jpg"
-```
-
-For `/api/register`, include additional form fields:
-```bash
-curl -X POST http://localhost:5000/api/register \
-  -H "X-API-Key: YOUR_KEY" \
-  -F "image=@photo.jpg" \
-  -F "label_id=101" \
-  -F "username=Budi" \
-  -F "target_pose=front"
-```
+| URL | Protocol | Access | Environment |
+|---|---|---|---|
+| `https://localhost:8443/` | HTTPS | Webcam Playground | Production/Staging |
+| `https://localhost:8443/docs` | HTTPS | Interactive API Docs | Production/Staging |
+| `http://localhost:8080/` | HTTP | Redirects to HTTPS `8443` | Production/Staging |
+| `http://localhost:5000/` | HTTP | Direct Gunicorn Access | Development/Debugging |
 
 ---
 
-## Server Specifications Recommendation
+## ✉️ API Specifications
 
-Since OpenCV DNN performs neural network inferences on CPU, performance depends heavily on the processor's clock speed and modern instruction sets.
+All requests (except `OPTIONS` and UI pages) must include the `X-API-Key` header if `FACE_API_KEY` is set in the environment.
 
-### 1. Key Hardware Requirements
-* **CPU**: Modern processor (Intel Xeon, AMD EPYC, Intel Core, AMD Ryzen) supporting **AVX2 or AVX-512** instructions. *AVX2 acceleration is critical to speed up YuNet and SFace calculations by 4x-5x on CPU.*
-* **RAM**: Very low memory footprint (~100MB for model runtime, ~12MB for 5,000 cached student vectors). 
-* **Storage**: Fast SSD is highly recommended to prevent write latency during SQLite inserts.
+### 1. Face Detection (`POST /api/detect`)
+Detects faces in an image and returns bounding box coordinates and confidences.
 
-### 2. Sizing Guidelines
+*   **Option A: Multipart Upload (Recommended)**
+    ```bash
+    curl -X POST https://localhost:8443/api/detect \
+      -H "X-API-Key: YOUR_API_KEY" \
+      -F "image=@frame.jpg" -k
+    ```
+*   **Option B: Base64 JSON (Legacy)**
+    ```bash
+    curl -X POST https://localhost:8443/api/detect \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_API_KEY" \
+      -d '{"frame": "data:image/jpeg;base64,/9j/4..."}' -k
+    ```
+*   **Success Response (200 OK)**:
+    ```json
+    {
+      "faces": [
+        { "x": 120, "y": 80, "w": 150, "h": 150, "confidence": 0.99 }
+      ]
+    }
+    ```
 
-| Scale (Students) | CPU (Cores) | RAM (vCPU) | Disk (SSD) | Typical VPS Instance |
-|------------------|-------------|------------|------------|----------------------|
+### 2. Register Face (`POST /api/register`)
+Registers a face embedding under a unique label ID and name. Filters for biometric quality ($\ge 80\%$) and head pose accuracy.
+
+*   **Option A: Multipart Upload (Recommended)**
+    ```bash
+    curl -X POST https://localhost:8443/api/register \
+      -H "X-API-Key: YOUR_API_KEY" \
+      -F "image=@frame.jpg" \
+      -F "label_id=101" \
+      -F "username=John Doe" \
+      -F "target_pose=front" -k
+    ```
+*   **Option B: Base64 JSON (Legacy)**
+    ```bash
+    curl -X POST https://localhost:8443/api/register \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_API_KEY" \
+      -d '{
+        "frame": "data:image/jpeg;base64,...",
+        "label_id": 101,
+        "username": "John Doe",
+        "target_pose": "front"
+      }' -k
+    ```
+
+### 3. Recognize Face (`POST /api/recognize`)
+Extracts a biometric vector from the image and compares it against all registered vectors using Cosine Similarity.
+
+*   **Option A: Multipart Upload (Recommended)**
+    ```bash
+    curl -X POST https://localhost:8443/api/recognize \
+      -H "X-API-Key: YOUR_API_KEY" \
+      -F "image=@frame.jpg" -k
+    ```
+*   **Option B: Base64 JSON (Legacy)**
+    ```bash
+    curl -X POST https://localhost:8443/api/recognize \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: YOUR_API_KEY" \
+      -d '{"frame": "data:image/jpeg;base64,..."}' -k
+    ```
+*   **Success Response (200 OK)**:
+    ```json
+    {
+      "faces": [
+        {
+          "x": 120, "y": 80, "w": 150, "h": 150,
+          "label_id": 101,
+          "name": "John Doe",
+          "confidence": 0.892
+        }
+      ]
+    }
+    ```
+
+---
+
+## 💻 Hardware & Sizing Guide
+
+Because OpenCV DNN runs inferences on CPU threads, speed is dependent on processor speed and modern instruction sets.
+
+*   **AVX2/AVX-512**: Highly recommended. Accelerates YuNet and SFace calculations by 4x on CPU.
+*   **RAM**: Footprint is extremely low (~100MB for engine, ~12MB for 5,000 cached vectors).
+
+| Scale (Students) | CPU (Cores) | RAM (vCPU) | Storage (SSD) | Suggested VPS Instance |
+|---|---|---|---|---|
 | **Small (<1,000)** | 1 Core (AVX2) | 1 GB | 10 GB | AWS `t3.micro` / DO $6 Droplet |
 | **Medium (1,000 - 5,000)** | 2 Cores (AVX2) | 2 GB | 20 GB | AWS `t3.medium` / DO $12 Droplet |
 | **Large (>5,000)** | 4 Cores (AVX2) | 4 GB | 50 GB | AWS `c5.large` / Compute Optimized |
