@@ -30,13 +30,17 @@ Designed for production environments to handle student attendance systems with t
 
 ## Project Structure
 
-- `app.py`: Main Flask REST API server and security hooks.
-- `detector.py`: YuNet CNN detector wrapper and landmark locator.
-- `recognizer.py`: SFace ONNX feature extractor and Cosine similarity math.
-- `storage.py`: SQLite Database CRUD actions and image Base64 decoder.
-- `test_backend.py`: Automated test cases (security, boundaries, math, CRUD).
-- `docs.html`: Production-grade API documentation portal (Swagger-style).
-- `index.html`: Client-side webcam interactive sandbox.
+- `src/`: Core Python backend source code.
+  - `app.py`: Main Flask REST API server and security hooks.
+  - `detector.py`: YuNet CNN detector wrapper, landmark locator, and pose classifier.
+  - `recognizer.py`: SFace ONNX feature extractor and Cosine similarity math.
+  - `storage.py`: SQLite Database CRUD actions and image Base64 decoder.
+  - `interfaces.py`: Clean interfaces separating responsibilities (SOLID).
+- `static/`: Static assets served by Flask.
+  - `index.html`: Client-side webcam interactive sandbox.
+  - `docs.html`: Production-grade API documentation portal (Swagger-style).
+- `tests/`: Automated unit tests.
+  - `test_backend.py`: Automated test cases (security, boundaries, math, CRUD).
 - `docker-compose.yml` & `Dockerfile`: Package orchestration for deployments.
 
 ---
@@ -63,7 +67,7 @@ docker compose up -d --build
 ### 3. Run Test Suite
 Execute the automated tests in the isolated Docker container environment:
 ```bash
-docker compose run --entrypoint "python -m unittest test_backend.py" face-recognition-api
+docker compose run --entrypoint "python -m unittest tests/test_backend.py" face-recognition-api
 ```
 
 ---
