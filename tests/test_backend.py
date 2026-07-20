@@ -1,5 +1,6 @@
 import os
 import sys
+import io
 import unittest
 import unittest.mock
 import numpy as np
@@ -10,6 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../s
 
 import storage
 from recognizer import SFRecognizer
+from cache import EmbeddingCache
 from app import app
 
 class TestFaceRecognitionBackend(unittest.TestCase):
@@ -169,7 +171,7 @@ class TestFaceRecognitionBackend(unittest.TestCase):
         
         # Sync memory cache
         import app as app_mod
-        app_mod.cached_embeddings = storage.load_embeddings()
+        app_mod.embedding_cache.invalidate()
         
         # 2. Mock detector and recognizer to return a face and the SAME embedding for the new request
         mock_detect.return_value = np.array([[10, 10, 50, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.99]])
@@ -235,3 +237,150 @@ class TestFaceRecognitionBackend(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMultipartUpload(unittest.TestCase):
+    """Tests for multipart/form-data image upload support."""
+
+    @classmethod
+    def setUpClass(cls):
+        app.config["FACE_API_KEY"] = "test-key"
+        cls.orig_db_path = storage.DB_PATH
+        storage.DB_PATH = "data/test_multipart.db"
+        storage.init_db()
+
+    @classmethod
+    def tearDownClass(cls):
+        storage.DB_PATH = cls.orig_db_path
+        for f in ["data/test_multipart.db", "data/test_multipart.db-wal", "data/test_multipart.db-shm"]:
+            if os.path.exists(f):
+                os.remove(f)
+
+    def test_multipart_detect_endpoint(self):
+        """Test that /api/detect accepts multipart/form-data with an image file."""
+        client = app.test_client()
+        # Create a minimal valid JPEG-like image using OpenCV
+        import cv2
+        img = np.zeros((100, 100, 3), dtype=np.uint8)
+        _, buf = cv2.imencode('.jpg', img)
+        image_bytes = buf.tobytes()
+
+        response = client.post(
+            "/api/detect",
+            data={"image": (io.BytesIO(image_bytes), "test.jpg")},
+            content_type="multipart/form-data",
+            headers={"X-API-Key": "test-key"}
+        )
+        self.assertEqual(response.status_code, 200)
+        json_data = response.get_json()
+        self.assertIn("faces", json_data)
+
+    def test_multipart_detect_missing_image(self):
+        """Test that /api/detect returns 400 when multipart upload has no image field."""
+        client = app.test_client()
+        response = client.post(
+            "/api/detect",
+            data={"other_field": "value"},
+            content_type="multipart/form-data",
+            headers={"X-API-Key": "test-key"}
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.get_json())
+
+    @unittest.mock.patch('app.detector.detect')
+    @unittest.mock.patch('app.recognizer.extract_embedding')
+    def test_multipart_register_endpoint(self, mock_extract, mock_detect):
+        """Test that /api/register accepts multipart/form-data with image + form fields."""
+        import cv2
+        # Mock detector and recognizer
+        mock_detect.return_value = np.array([[10, 10, 50, 50, 100.0, 0, 200.0, 0, 150.0, 0, 0, 0, 0, 0, 0.99]])
+        mock_extract.return_value = np.random.rand(1, 128).astype(np.float32)
+
+        img = np.zeros((100, 100, 3), dtype=np.uint8)
+        _, buf = cv2.imencode('.jpg', img)
+        image_bytes = buf.tobytes()
+
+        client = app.test_client()
+        response = client.post(
+            "/api/register",
+            data={
+                "image": (io.BytesIO(image_bytes), "test.jpg"),
+                "label_id": "999",
+                "username": "Multipart User",
+                "target_pose": "front"
+            },
+            content_type="multipart/form-data",
+            headers={"X-API-Key": "test-key"}
+        )
+        self.assertEqual(response.status_code, 200)
+        json_data = response.get_json()
+        self.assertEqual(json_data["status"], "success")
+
+
+class TestEmbeddingCache(unittest.TestCase):
+    """Tests for the version-based embedding cache invalidation system."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.orig_db_path = storage.DB_PATH
+        storage.DB_PATH = "data/test_cache.db"
+        storage.init_db()
+
+    @classmethod
+    def tearDownClass(cls):
+        storage.DB_PATH = cls.orig_db_path
+        for f in ["data/test_cache.db", "data/test_cache.db-wal", "data/test_cache.db-shm"]:
+            if os.path.exists(f):
+                os.remove(f)
+
+    def setUp(self):
+        conn = sqlite3.connect(storage.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM profiles")
+        cursor.execute("DELETE FROM embeddings")
+        cursor.execute("UPDATE cache_version SET version = 0 WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+    def test_cache_version_increments_on_save(self):
+        """Test that saving an embedding increments the cache version counter."""
+        v_before = storage.get_cache_version()
+        storage.register_user(1, "Test")
+        storage.save_embedding(1, np.random.rand(1, 128).astype(np.float32))
+        v_after = storage.get_cache_version()
+        self.assertEqual(v_after, v_before + 1)
+
+    def test_cache_version_increments_on_delete(self):
+        """Test that deleting a user increments the cache version counter."""
+        storage.register_user(2, "Test2")
+        storage.save_embedding(2, np.random.rand(1, 128).astype(np.float32))
+        v_before = storage.get_cache_version()
+        storage.delete_user(2)
+        v_after = storage.get_cache_version()
+        self.assertEqual(v_after, v_before + 1)
+
+    def test_cache_auto_reloads_on_version_change(self):
+        """Test that EmbeddingCache automatically reloads when version changes."""
+        cache = EmbeddingCache()
+        
+        # Initially empty
+        self.assertEqual(len(cache.get_embeddings()), 0)
+        
+        # Save an embedding (increments version)
+        storage.register_user(3, "Test3")
+        storage.save_embedding(3, np.random.rand(1, 128).astype(np.float32))
+        
+        # Cache should auto-detect version change and reload
+        embeddings = cache.get_embeddings()
+        self.assertIn(3, embeddings)
+
+    def test_cache_no_reload_when_unchanged(self):
+        """Test that EmbeddingCache does NOT reload from DB when version hasn't changed."""
+        cache = EmbeddingCache()
+        
+        # First access loads from DB
+        result1 = cache.get_embeddings()
+        
+        # Second access should return same object (no reload) since version unchanged
+        result2 = cache.get_embeddings()
+        self.assertIs(result1, result2)  # Same object reference = no reload happened

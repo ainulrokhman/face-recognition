@@ -7,6 +7,8 @@ from flask import Flask, request, jsonify, send_from_directory
 import storage
 from detector import YuNetDetector
 from recognizer import SFRecognizer
+from cache import EmbeddingCache
+from image_utils import parse_image_from_request
 
 # Initialize Flask application
 app = Flask(__name__, static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static")))
@@ -14,8 +16,8 @@ app = Flask(__name__, static_folder=os.path.abspath(os.path.join(os.path.dirname
 # Initialize SQLite database schema
 storage.init_db()
 
-# Cache embeddings in RAM at startup for sub-millisecond matching
-cached_embeddings = storage.load_embeddings()
+# Version-based embedding cache: auto-reloads from SQLite only when data changes
+embedding_cache = EmbeddingCache()
 
 # Dependency Injection of high-accuracy models
 detector = YuNetDetector()
@@ -71,20 +73,16 @@ def get_status():
     profiles = storage.load_profiles()
     return jsonify({
         "status": "online",
-        "model_trained": recognizer.is_trained() and len(cached_embeddings) > 0,
+        "model_trained": recognizer.is_trained() and len(embedding_cache.get_embeddings()) > 0,
         "registered_users": profiles
     })
 
 @app.route("/api/detect", methods=["POST"])
 def api_detect():
-    """Detects faces in a posted base64 frame using CNN YuNet."""
-    data = request.get_json()
-    if not data or "frame" not in data:
-        return jsonify({"error": "Missing 'frame' parameter"}), 400
-        
-    img = storage.decode_base64_image(data["frame"])
-    if img is None:
-        return jsonify({"error": "Failed to decode base64 frame"}), 400
+    """Detects faces in a posted image. Accepts both multipart/form-data and JSON base64."""
+    img, extra_fields, error = parse_image_from_request(request)
+    if error:
+        return jsonify({"error": error}), 400
         
     # YuNet operates directly on BGR frames
     faces = detector.detect(img)
@@ -106,27 +104,26 @@ def api_detect():
 
 @app.route("/api/register", methods=["POST"])
 def api_register():
-    """Registers a face vector under a specific label ID, verifying pose and quality."""
-    global cached_embeddings
+    """Registers a face vector under a specific label ID, verifying pose and quality.
+    Accepts both multipart/form-data and JSON base64."""
+    img, extra_fields, error = parse_image_from_request(request)
+    if error:
+        return jsonify({"error": error}), 400
     
-    data = request.get_json()
-    if not data or "frame" not in data or "label_id" not in data or "username" not in data:
-        return jsonify({"error": "Missing frame, label_id, or username parameters"}), 400
+    # Validate required metadata fields
+    if "label_id" not in extra_fields or "username" not in extra_fields:
+        return jsonify({"error": "Missing label_id or username parameters"}), 400
         
     try:
-        label_id = int(data["label_id"])
+        label_id = int(extra_fields["label_id"])
     except ValueError:
         return jsonify({"error": "label_id must be an integer"}), 400
         
-    username = data["username"].strip()
+    username = extra_fields["username"].strip()
     if not username:
         return jsonify({"error": "username cannot be empty"}), 400
         
-    target_pose = data.get("target_pose", "front")
-    
-    img = storage.decode_base64_image(data["frame"])
-    if img is None:
-        return jsonify({"error": "Failed to decode base64 frame"}), 400
+    target_pose = extra_fields.get("target_pose", "front")
         
     # Run face detection
     faces = detector.detect(img)
@@ -170,9 +167,10 @@ def api_register():
         return jsonify({"status": "error", "message": "Failed to extract face vector."}), 500
         
     # Duplicate face prevention check
-    if len(cached_embeddings) > 0:
+    current_embeddings = embedding_cache.get_embeddings()
+    if len(current_embeddings) > 0:
         # Match using a strict threshold (0.45) to ensure it's a confident match
-        matched_id, score = recognizer.match(embedding, cached_embeddings, threshold=0.45)
+        matched_id, score = recognizer.match(embedding, current_embeddings, threshold=0.45)
         # Block only if the face matches a different label_id
         if matched_id != -1 and matched_id != label_id:
             profiles = storage.load_profiles()
@@ -188,8 +186,8 @@ def api_register():
     storage.save_embedding(label_id, embedding)
     storage.register_user(label_id, username)
     
-    # Reload embeddings cache in memory
-    cached_embeddings = storage.load_embeddings()
+    # Invalidate cache so next access reloads from DB (version counter was already incremented by storage)
+    embedding_cache.invalidate()
     
     return jsonify({
         "status": "success",
@@ -205,26 +203,22 @@ def api_register():
 @app.route("/api/train", methods=["POST"])
 def api_train():
     """Keeps backward compatibility with the frontend. Simply synchronizes database and runs GC."""
-    global cached_embeddings
-    cached_embeddings = storage.load_embeddings()
+    embedding_cache.invalidate()
     gc.collect()
     return jsonify({"status": "success", "message": "Database synchronized and memory optimized."})
 
 @app.route("/api/recognize", methods=["POST"])
 def api_recognize():
-    """Runs high-accuracy SFace recognition on a posted BGR base64 frame."""
-    data = request.get_json()
-    if not data or "frame" not in data:
-        return jsonify({"error": "Missing 'frame' parameter"}), 400
-        
-    img = storage.decode_base64_image(data["frame"])
-    if img is None:
-        return jsonify({"error": "Failed to decode base64 frame"}), 400
+    """Runs high-accuracy SFace recognition. Accepts both multipart/form-data and JSON base64."""
+    img, extra_fields, error = parse_image_from_request(request)
+    if error:
+        return jsonify({"error": error}), 400
         
     # Detect faces via YuNet CNN
     faces = detector.detect(img)
     
     profiles = storage.load_profiles()
+    current_embeddings = embedding_cache.get_embeddings()
     results = []
     
     if faces is not None:
@@ -237,10 +231,10 @@ def api_recognize():
             
             # Extract face vector embedding
             embedding = recognizer.extract_embedding(img, face_detection)
-            if embedding is not None and len(cached_embeddings) > 0:
+            if embedding is not None and len(current_embeddings) > 0:
                 # Query nearest-neighbor matching via Cosine Similarity
                 # OpenCV SFace Cosine match threshold is ~0.363
-                matched_id, score = recognizer.match(embedding, cached_embeddings, threshold=0.363)
+                matched_id, score = recognizer.match(embedding, current_embeddings, threshold=0.363)
                 if matched_id != -1:
                     label_id = matched_id
                     confidence = score
@@ -264,8 +258,6 @@ def api_recognize():
 @app.route("/api/delete", methods=["POST"])
 def api_delete():
     """Deletes a user profile and updates cache."""
-    global cached_embeddings
-    
     data = request.get_json()
     if not data or "label_id" not in data:
         return jsonify({"error": "Missing label_id parameter"}), 400
@@ -277,7 +269,7 @@ def api_delete():
         
     success = storage.delete_user(label_id)
     if success:
-        cached_embeddings = storage.load_embeddings()
+        embedding_cache.invalidate()
         return jsonify({"status": "success", "message": f"Deleted user ID {label_id}"})
     return jsonify({"status": "error", "message": "Failed to delete user."}), 500
 

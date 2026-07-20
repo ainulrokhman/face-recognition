@@ -631,7 +631,8 @@
                     </div>
                     <div class="tabs-content">
                         <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
-                        <pre class="tab-pane active" data-lang="curl"><code>curl -X POST http://localhost:5000/api/register \
+                        <pre class="tab-pane active" data-lang="curl"><code># Option 1: JSON Base64
+curl -X POST http://localhost:5000/api/register \
   -H "Content-Type: application/json" \
   -H "X-API-Key: YOUR_API_KEY_HERE" \
   -d '{
@@ -639,7 +640,15 @@
     "username": "Budi",
     "frame": "data:image/jpeg;base64,/9j/4...",
     "target_pose": "front"
-  }'</code></pre>
+  }'
+
+# Option 2: Multipart File Upload (saves ~33% bandwidth)
+curl -X POST http://localhost:5000/api/register \
+  -H "X-API-Key: YOUR_API_KEY_HERE" \
+  -F "image=@photo.jpg" \
+  -F "label_id=101" \
+  -F "username=Budi" \
+  -F "target_pose=front"</code></pre>
                         <pre class="tab-pane" data-lang="js"><code>const response = await fetch('http://localhost:5000/api/register', {
     method: 'POST',
     headers: {
@@ -802,12 +811,18 @@ func main() {
                     </div>
                     <div class="tabs-content">
                         <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
-                        <pre class="tab-pane active" data-lang="curl"><code>curl -X POST http://localhost:5000/api/recognize \
+                        <pre class="tab-pane active" data-lang="curl"><code># Option 1: JSON Base64
+curl -X POST http://localhost:5000/api/recognize \
   -H "Content-Type: application/json" \
   -H "X-API-Key: YOUR_API_KEY_HERE" \
   -d '{
     "frame": "data:image/jpeg;base64,/9j/4..."
-  }'</code></pre>
+  }'
+
+# Option 2: Multipart File Upload (saves ~33% bandwidth)
+curl -X POST http://localhost:5000/api/recognize \
+  -H "X-API-Key: YOUR_API_KEY_HERE" \
+  -F "image=@photo.jpg"</code></pre>
                         <pre class="tab-pane" data-lang="js"><code>const response = await fetch('http://localhost:5000/api/recognize', {
     method: 'POST',
     headers: {

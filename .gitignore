@@ -40,3 +40,10 @@ env/
 *.swp
 *.swo
 .DS_Store
+
+# 8. Nginx SSL Certificates (self-signed or production)
+nginx/ssl/
+
+# 9. SQLite WAL mode files
+data/*.db-wal
+data/*.db-shm

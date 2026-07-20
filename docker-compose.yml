@@ -2,6 +2,7 @@ services:
   face-recognition-api:
     build: .
     container_name: face-recognition-api
+    # Port 5000 exposed for direct development access; Nginx proxies via internal network
     ports:
       - "5000:5000"
     volumes:
@@ -12,4 +13,17 @@ services:
       # Inject environment variables loaded from local .env file
       - FACE_API_KEY=${FACE_API_KEY:-}
       - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: face-recognition-nginx
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - face-recognition-api
     restart: unless-stopped
