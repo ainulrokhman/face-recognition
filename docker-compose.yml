@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  face-recognition-api:
+    build: .
+    container_name: face-recognition-api
+    ports:
+      - "5000:5000"
+    volumes:
+      # Persistent bind mounts: ensures face images and trained models are stored on host machine
+      - ./dataset:/app/dataset
+      - ./data:/app/data
+    environment:
+      # Inject environment variables loaded from local .env file
+      - FACE_API_KEY=${FACE_API_KEY:-}
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
+    restart: unless-stopped

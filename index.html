@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition API Playground (DNN + SFace)</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.6);
+            --border-color: rgba(99, 102, 241, 0.15);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --accent-teal: #06b6d4;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --glow-indigo: rgba(99, 102, 241, 0.25);
+            --glow-teal: rgba(6, 182, 212, 0.25);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.1) 0px, transparent 50%);
+        }
+
+        header {
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(11, 15, 25, 0.8);
+            backdrop-filter: blur(12px);
+            padding: 1.25rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 2rem;
+            height: 2rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent-teal));
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            box-shadow: 0 0 15px var(--glow-indigo);
+        }
+
+        .logo-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            background: linear-gradient(to right, #ffffff, #a5b4fc);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(31, 41, 55, 0.5);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            background-color: var(--accent-red);
+            border-radius: 50%;
+            transition: background-color 0.3s;
+        }
+
+        .status-dot.active {
+            background-color: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        main {
+            flex: 1;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(16px);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .feed-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4/3;
+            background-color: #020617;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+
+        #video-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror camera stream */
+        }
+
+        #canvas-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            transform: scaleX(-1); /* Mirror canvas to match video */
+            z-index: 2;
+        }
+
+        /* Scanning Line Animation */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, var(--accent-teal), transparent);
+            box-shadow: 0 0 10px var(--accent-teal);
+            z-index: 3;
+            animation: scan 4s linear infinite;
+            display: none;
+        }
+
+        .scan-line.active {
+            display: block;
+        }
+
+        @keyframes scan {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+
+        /* Camera flash effect */
+        .flash-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            opacity: 0;
+            z-index: 4;
+            pointer-events: none;
+            transition: opacity 0.15s ease-out;
+        }
+
+        .flash-overlay.flash {
+            opacity: 0.8;
+            transition: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: #ffffff;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+            box-shadow: 0 0 15px var(--glow-indigo);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            background-color: rgba(31, 41, 55, 0.6);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(55, 65, 81, 0.8);
+            box-shadow: none;
+        }
+
+        .btn-teal {
+            background-color: var(--accent-teal);
+        }
+
+        .btn-teal:hover {
+            background-color: #0891b2;
+            box-shadow: 0 0 15px var(--glow-teal);
+        }
+
+        .btn-danger {
+            background-color: var(--accent-red);
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            border-radius: 0.25rem;
+        }
+
+        .btn-danger:hover {
+            background-color: #dc2626;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none !important;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 0.75rem;
+        }
+
+        input {
+            background: rgba(31, 41, 55, 0.4);
+            border: 1px solid var(--border-color);
+            color: #ffffff;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 8px var(--glow-indigo);
+        }
+
+        .registration-progress {
+            display: none;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .registration-progress.active {
+            display: flex;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background-color: rgba(31, 41, 55, 0.6);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(to right, var(--primary), var(--accent-teal));
+            transition: width 0.1s ease;
+        }
+
+        .progress-text {
+            font-size: 0.8rem;
+            color: var(--accent-teal);
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .stat-box {
+            background: rgba(17, 24, 39, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .profile-list-container {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: rgba(3, 7, 18, 0.4);
+        }
+
+        .profile-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+
+        .profile-table th, .profile-table td {
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .profile-table th {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .profile-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .terminal-log {
+            flex: 1;
+            min-height: 180px;
+            max-height: 250px;
+            background-color: rgba(3, 7, 18, 0.95);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #38bdf8;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+        }
+
+        .log-entry {
+            display: flex;
+            gap: 0.75rem;
+            line-height: 1.4;
+        }
+
+        .log-time {
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        .log-text {
+            word-break: break-all;
+        }
+
+        .log-success { color: var(--accent-green); }
+        .log-info { color: #f3f4f6; }
+        .log-warning { color: #f59e0b; }
+        .log-error { color: var(--accent-red); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-area">
+            <div class="logo-icon">AI</div>
+            <div class="logo-title">Face Recognition DNN API (SFace)</div>
+        </div>
+        <div class="status-badge">
+            <div id="status-dot" class="status-dot"></div>
+            <span id="status-text">Connecting to API...</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Left Column: Camera and Stream -->
+        <div class="card">
+            <div class="card-title">
+                <span>Webcam Live Stream</span>
+                <span id="stream-type-pill" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px; background: rgba(6,182,212,0.1); border: 1px solid var(--accent-teal); color: var(--accent-teal);">YuNet + SFace Active</span>
+            </div>
+            
+            <div class="feed-container">
+                <video id="video-feed" autoplay playsinline muted></video>
+                <canvas id="canvas-overlay"></canvas>
+                <div id="scan-line" class="scan-line"></div>
+                <div id="flash-overlay" class="flash-overlay"></div>
+            </div>
+
+            <div class="controls">
+                <button id="btn-toggle-recognition" class="btn" disabled>
+                    Start Real-Time Recognition
+                </button>
+                <button id="btn-stop-camera" class="btn btn-secondary">Stop Camera</button>
+            </div>
+        </div>
+
+        <!-- Right Column: Registration and DB Operations -->
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            <!-- Register & Training -->
+            <div class="card">
+                <div class="card-title">Register Student Face (DNN Vector)</div>
+                
+                <div class="form-group">
+                    <label>Registration Details</label>
+                    <div class="input-row">
+                        <input type="number" id="input-label-id" placeholder="ID (e.g. 101)" min="1">
+                        <input type="text" id="input-username" placeholder="Student Name (e.g. Budi)">
+                    </div>
+                </div>
+
+                <button id="btn-register" class="btn btn-teal" disabled>
+                    Capture 20 CNN Embeddings
+                </button>
+
+                <div id="reg-progress" class="registration-progress">
+                    <div class="progress-text">
+                        <span id="reg-progress-msg">Extracting CNN feature vectors...</span>
+                        <span id="reg-progress-pct">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="reg-progress-fill" class="progress-bar-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Registered Student List -->
+            <div class="card">
+                <div class="card-title">Registered Student Profiles</div>
+                <div class="profile-list-container">
+                    <table class="profile-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Registered At</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="profiles-tbody">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: var(--text-secondary);">No profiles registered yet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Stats & Diagnostics -->
+            <div class="card">
+                <div class="card-title">System Metrics</div>
+                <div class="status-grid">
+                    <div class="stat-box">
+                        <div id="stat-registered-count" class="stat-value">0</div>
+                        <div class="stat-label">Registered Students</div>
+                    </div>
+                    <div class="stat-box">
+                        <div id="stat-model-status" class="stat-value" style="font-size: 1.1rem; padding: 0.25rem 0;">No Vectors</div>
+                        <div class="stat-label">Database Index</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Logs Terminal -->
+            <div class="card">
+                <div class="card-title">Real-Time Action Logs</div>
+                <div id="terminal-log" class="terminal-log">
+                    <div class="log-entry">
+                        <span class="log-time">[System]</span>
+                        <span class="log-text log-info">Page initialized. Connecting to SQLite/DNN backend...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = window.location.origin; // Same origin when served by Flask
+        
+        // Element caching
+        const video = document.getElementById('video-feed');
+        const overlay = document.getElementById('canvas-overlay');
+        const ctx = overlay.getContext('2d');
+        const scanLine = document.getElementById('scan-line');
+        const flashOverlay = document.getElementById('flash-overlay');
+        
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        
+        const btnToggleRec = document.getElementById('btn-toggle-recognition');
+        const btnStopCam = document.getElementById('btn-stop-camera');
+        
+        const inputLabelId = document.getElementById('input-label-id');
+        const inputUsername = document.getElementById('input-username');
+        const btnRegister = document.getElementById('btn-register');
+        const profilesTbody = document.getElementById('profiles-tbody');
+        
+        const regProgress = document.getElementById('reg-progress');
+        const regProgressMsg = document.getElementById('reg-progress-msg');
+        const regProgressPct = document.getElementById('reg-progress-pct');
+        const regProgressFill = document.getElementById('reg-progress-fill');
+        
+        const statRegisteredCount = document.getElementById('stat-registered-count');
+        const statModelStatus = document.getElementById('stat-model-status');
+        const terminalLog = document.getElementById('terminal-log');
+
+        // State variables
+        let isCamActive = false;
+        let isRecognizing = false;
+        let recognitionInterval = null;
+        let registerInterval = null;
+
+        // Sync overlay canvas size
+        function resizeOverlay() {
+            overlay.width = video.clientWidth;
+            overlay.height = video.clientHeight;
+        }
+        window.addEventListener('resize', resizeOverlay);
+        video.addEventListener('loadedmetadata', resizeOverlay);
+
+        // Logging helper
+        function addLog(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            let classType = 'log-info';
+            if (type === 'success') classType = 'log-success';
+            if (type === 'warning') classType = 'log-warning';
+            if (type === 'error') classType = 'log-error';
+            
+            entry.innerHTML = `
+                <span class="log-time">[${time}]</span>
+                <span class="log-text ${classType}">${message}</span>
+            `;
+            terminalLog.appendChild(entry);
+            terminalLog.scrollTop = terminalLog.scrollHeight;
+        }
+
+        // Fetch API status and load registered user profiles
+        async function fetchAPIStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/status`);
+                if (!res.ok) throw new Error("HTTP error " + res.status);
+                const data = await res.json();
+                
+                statusDot.classList.add('active');
+                statusText.innerText = "API Online (SFace)";
+                
+                // Update registered count
+                const users = data.registered_users;
+                const usersCount = Object.keys(users).length;
+                statRegisteredCount.innerText = usersCount;
+                
+                if (data.model_trained) {
+                    statModelStatus.innerText = "LOADED";
+                    statModelStatus.style.color = "var(--accent-green)";
+                } else {
+                    statModelStatus.innerText = "EMPTY";
+                    statModelStatus.style.color = "var(--accent-red)";
+                }
+                
+                // Render profiles list in table
+                renderProfiles(users);
+                
+                return true;
+            } catch (err) {
+                statusDot.classList.remove('active');
+                statusText.innerText = "API Offline";
+                addLog(`API Handshake failed: ${err.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Render registered users profiles table
+        function renderProfiles(users) {
+            const keys = Object.keys(users);
+            if (keys.length === 0) {
+                profilesTbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: var(--text-secondary);">No profiles registered yet.</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            profilesTbody.innerHTML = keys.map(id => {
+                const user = users[id];
+                return `
+                    <tr>
+                        <td><strong>${id}</strong></td>
+                        <td>${user.name}</td>
+                        <td style="color: var(--text-secondary); font-size: 0.75rem;">${user.created_at}</td>
+                        <td>
+                            <button onclick="deleteProfile(${id})" class="btn btn-danger">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Delete user profile
+        async function deleteProfile(id) {
+            if (!confirm(`Are you sure you want to delete profile ID ${id}?`)) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ label_id: id })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    addLog(`Successfully deleted profile ID ${id}.`, 'success');
+                    fetchAPIStatus();
+                } else {
+                    throw new Error(data.message || 'Deletion error');
+                }
+            } catch (err) {
+                addLog(`Delete profile failed: ${err.message}`, 'error');
+            }
+        }
+
+        // Start Camera
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: 'user' },
+                    audio: false
+                });
+                video.srcObject = stream;
+                isCamActive = true;
+                btnStopCam.disabled = false;
+                btnRegister.disabled = false;
+                btnToggleRec.disabled = false;
+                addLog("Webcam stream started successfully.", "success");
+                resizeOverlay();
+            } catch (err) {
+                addLog(`Webcam access error: ${err.message}. Check camera connections.`, 'error');
+            }
+        }
+
+        // Stop Camera
+        function stopCamera() {
+            if (isRecognizing) toggleRecognition();
+            
+            if (video.srcObject) {
+                const tracks = video.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            isCamActive = false;
+            btnStopCam.disabled = true;
+            btnRegister.disabled = true;
+            btnToggleRec.disabled = true;
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
+            addLog("Webcam stream stopped.", "info");
+        }
+
+        // Toggle Real-time Recognition
+        function toggleRecognition() {
+            if (isRecognizing) {
+                isRecognizing = false;
+                clearInterval(recognitionInterval);
+                scanLine.classList.remove('active');
+                btnToggleRec.innerText = "Start Real-Time Recognition";
+                btnToggleRec.classList.remove('btn-teal');
+                ctx.clearRect(0, 0, overlay.width, overlay.height);
+                addLog("Real-time recognition paused.", "info");
+            } else {
+                isRecognizing = true;
+                scanLine.classList.add('active');
+                btnToggleRec.innerText = "Pause Real-Time Recognition";
+                btnToggleRec.classList.add('btn-teal');
+                addLog("Real-time recognition active (using CNN SFace).", "success");
+                
+                // Process frame loop
+                recognitionInterval = setInterval(processFrame, 200);
+            }
+        }
+
+        // Capture base64 frame from video
+        function getBase64Frame() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth || 640;
+            tempCanvas.height = video.videoHeight || 480;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+            return tempCanvas.toDataURL('image/jpeg', 0.85);
+        }
+
+        // Process a single frame for face recognition
+        async function processFrame() {
+            if (!isCamActive || !isRecognizing) return;
+            
+            const frameData = getBase64Frame();
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/recognize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ frame: frameData })
+                });
+                
+                if (!res.ok) throw new Error("HTTP " + res.status);
+                const data = await res.json();
+                
+                drawDetections(data.faces);
+                
+                // Log confident detections (Cosine score similarity > 0.363 is SFace standard match)
+                data.faces.forEach(face => {
+                    if (face.name !== "Unknown") {
+                        addLog(`Identified: ${face.name} (Sim: ${face.confidence})`, 'success');
+                    } else {
+                        addLog(`Unregistered face detected in view.`, 'warning');
+                    }
+                });
+            } catch (err) {
+                addLog(`Recognition API error: ${err.message}`, 'error');
+            }
+        }
+
+        // Draw bounding boxes on overlay canvas
+        function drawDetections(faces) {
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
+            
+            if (!video.videoWidth) return;
+            
+            const scaleX = overlay.width / video.videoWidth;
+            const scaleY = overlay.height / video.videoHeight;
+            
+            faces.forEach(face => {
+                const x = face.x * scaleX;
+                const y = face.y * scaleY;
+                const w = face.w * scaleX;
+                const h = face.h * scaleY;
+                
+                // Draw Box
+                ctx.strokeStyle = face.name !== "Unknown" ? '#10b981' : '#6366f1';
+                ctx.lineWidth = 3;
+                ctx.lineJoin = 'round';
+                ctx.strokeRect(x, y, w, h);
+                
+                // Draw Box Corners (Teal glow)
+                ctx.strokeStyle = '#06b6d4';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+                
+                // Draw Label Background
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                ctx.fillRect(x, y - 28, Math.max(w, 150), 28);
+                
+                // Draw Label Text
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Inter';
+                const labelText = face.name !== "Unknown" 
+                    ? `${face.name} (Sim: ${face.confidence})`
+                    : "Unknown Profile";
+                ctx.fillText(labelText, x + 8, y - 10);
+            });
+        }
+
+        // Register Face Workflow (Capturing 20 frames)
+        async function startRegistration() {
+            const labelId = parseInt(inputLabelId.value);
+            const username = inputUsername.value.trim();
+            
+            if (isNaN(labelId) || labelId <= 0) {
+                alert("Please enter a valid integer for Label ID.");
+                inputLabelId.focus();
+                return;
+            }
+            if (!username) {
+                alert("Please enter a student name.");
+                inputUsername.focus();
+                return;
+            }
+            
+            const wasRecognizing = isRecognizing;
+            if (isRecognizing) toggleRecognition();
+            
+            btnRegister.disabled = true;
+            btnToggleRec.disabled = true;
+            regProgress.classList.add('active');
+            addLog(`Registering student '${username}' (ID: ${labelId}). Keep looking straight at the camera.`, 'info');
+            
+            let count = 0;
+            const maxSamples = 20;
+            
+            registerInterval = setInterval(async () => {
+                if (count >= maxSamples) {
+                    clearInterval(registerInterval);
+                    btnRegister.disabled = false;
+                    btnToggleRec.disabled = false;
+                    regProgress.classList.remove('active');
+                    
+                    addLog(`Success! Registered 20 vectors for student '${username}'.`, 'success');
+                    fetchAPIStatus(); // Refresh table and count metrics
+                    
+                    if (wasRecognizing) toggleRecognition();
+                    return;
+                }
+                // Dynamic Pose Guidance based on current count
+                let targetPose = "front";
+                let poseGuide = "Please look straight ahead...";
+                if (count >= 6 && count < 13) {
+                    targetPose = "left";
+                    poseGuide = "Please turn your head slightly to the left...";
+                } else if (count >= 13) {
+                    targetPose = "right";
+                    poseGuide = "Please turn your head slightly to the right...";
+                }
+                
+                regProgressMsg.innerText = `[${count}/${maxSamples}] ${poseGuide}`;
+                
+                // Flash overlay feedback
+                flashOverlay.classList.add('flash');
+                setTimeout(() => flashOverlay.classList.remove('flash'), 80);
+                
+                // Capture and send
+                const frameData = getBase64Frame();
+                try {
+                    const res = await fetch(`${API_BASE}/api/register`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            label_id: labelId,
+                            username: username,
+                            frame: frameData,
+                            target_pose: targetPose
+                        })
+                    });
+                    
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        count++;
+                        
+                        // Update progress bar
+                        const percent = Math.round((count / maxSamples) * 100);
+                        regProgressPct.innerText = `${percent}%`;
+                        regProgressFill.style.width = `${percent}%`;
+                        
+                        addLog(`Saved embedding sample ${count}/${maxSamples}`, 'info');
+                    } else if (data.status === 'poor_quality') {
+                        addLog(`Frame skipped: ${data.message}`, 'warning');
+                        regProgressMsg.innerText = `[${count}/${maxSamples}] Poor image quality! Please adjust position...`;
+                    } else if (data.status === 'pose_mismatch') {
+                        addLog(`Frame skipped: ${data.message}`, 'warning');
+                        regProgressMsg.innerText = `[${count}/${maxSamples}] ${data.message}`;
+                    } else if (data.status === 'duplicate_detected') {
+                        addLog(`Registration aborted: ${data.message}`, 'error');
+                        clearInterval(registerInterval);
+                        btnRegister.disabled = false;
+                        btnToggleRec.disabled = false;
+                        regProgress.classList.remove('active');
+                        if (wasRecognizing) toggleRecognition();
+                        return;
+                    } else if (data.status === 'no_face_detected') {
+                        addLog(`Sample ${count}/${maxSamples}: No face detected. Adjust lighting/position.`, 'warning');
+                    }
+                } catch (err) {
+                    addLog(`Register error on sample ${count}: ${err.message}`, 'error');
+                }
+            }, 250); // 250ms interval
+        }
+
+        // Event Listeners
+        btnToggleRec.addEventListener('click', toggleRecognition);
+        btnStopCam.addEventListener('click', () => {
+            if (isCamActive) {
+                stopCamera();
+                btnStopCam.innerText = "Start Camera";
+                btnStopCam.classList.add('btn-teal');
+            } else {
+                startCamera();
+                btnStopCam.innerText = "Stop Camera";
+                btnStopCam.classList.remove('btn-teal');
+            }
+        });
+        
+        btnRegister.addEventListener('click', startRegistration);
+
+        // Bootstrap page setup
+        async function initPage() {
+            const online = await fetchAPIStatus();
+            if (online) {
+                await startCamera();
+            } else {
+                addLog("API is offline. Ensure the Python/Docker service is running on port 5000.", 'error');
+            }
+        }
+        
+        initPage();
+    </script>
+</body>
+</html>

@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition API - Production Documentation</title>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #090d16;
+            --sidebar-bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.4);
+            --border-color: rgba(99, 102, 241, 0.15);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --accent-teal: #14b8a6;
+            --accent-green: #10b981;
+            --accent-red: #f43f5e;
+            --code-bg: #030712;
+            --glow-purple: rgba(139, 92, 246, 0.25);
+            --glow-teal: rgba(20, 184, 166, 0.25);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(20, 184, 166, 0.08) 0px, transparent 50%);
+        }
+
+        /* Sidebar Styling */
+        aside {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem 1.5rem;
+            gap: 2rem;
+            z-index: 10;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 2.25rem;
+            height: 2.25rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent-teal));
+            border-radius: 0.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #ffffff;
+            box-shadow: 0 0 15px var(--glow-purple);
+        }
+
+        .logo-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #ffffff, #c7d2fe);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .nav-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 0.75rem;
+            border-radius: 0.5rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .nav-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+        }
+
+        .nav-item.active {
+            background-color: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #ffffff;
+        }
+
+        .method-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.1rem 0.4rem;
+            border-radius: 0.25rem;
+            text-transform: uppercase;
+        }
+
+        .method-get { background-color: rgba(16, 185, 129, 0.15); color: var(--accent-green); }
+        .method-post { background-color: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+
+        /* Main Content Styling */
+        main {
+            flex: 1;
+            padding: 3rem 4rem;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: 4rem;
+            overflow-y: auto;
+        }
+
+        section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            scroll-margin-top: 3rem;
+        }
+
+        .section-header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .section-desc {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        /* Card panels */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(12px);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .card-header {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Endpoint URL Bar */
+        .endpoint-bar {
+            background-color: #030712;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .endpoint-path {
+            color: #ffffff;
+        }
+
+        .endpoint-host {
+            color: var(--text-secondary);
+        }
+
+        /* Table parameters */
+        .params-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+
+        .params-table th, .params-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .params-table th {
+            background-color: rgba(255, 255, 255, 0.03);
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .param-name {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-teal);
+            font-weight: 500;
+        }
+
+        .param-type {
+            font-family: 'JetBrains Mono', monospace;
+            color: #ec4899;
+        }
+
+        .param-req {
+            color: var(--accent-red);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* Code Snippet Tabs */
+        .tabs-container {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            overflow: hidden;
+            background-color: var(--code-bg);
+        }
+
+        .tabs-header {
+            display: flex;
+            background-color: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.75rem 1.25rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+            border-right: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .tab-btn:hover {
+            color: #ffffff;
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .tab-btn.active {
+            color: #ffffff;
+            background-color: rgba(139, 92, 246, 0.15);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .tabs-content {
+            padding: 1.25rem;
+            position: relative;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.825rem;
+            line-height: 1.5;
+            color: #38bdf8;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+            padding: 0.35rem 0.75rem;
+            font-size: 0.75rem;
+            border-radius: 0.35rem;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        /* Playground Panel */
+        .playground-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .playground-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .play-input {
+            background-color: rgba(3, 7, 18, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            padding: 0.75rem;
+            width: 100%;
+            height: 120px;
+            resize: none;
+            outline: none;
+        }
+
+        .play-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 10px var(--glow-purple);
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: #ffffff;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .play-output-container {
+            background-color: #030712;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            min-height: 120px;
+            max-height: 250px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #10b981;
+        }
+
+        /* Informational panels */
+        .info-box {
+            background: rgba(99, 102, 241, 0.05);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #c7d2fe;
+        }
+
+        .info-box strong {
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar Navigation -->
+    <aside>
+        <div class="logo-area">
+            <div class="logo-icon">API</div>
+            <div class="logo-title">Face Recog API</div>
+        </div>
+        
+        <div class="nav-group">
+            <span class="nav-label">Introduction</span>
+            <a href="#intro" class="nav-item active">Getting Started</a>
+        </div>
+
+        <div class="nav-group">
+            <span class="nav-label">Endpoints</span>
+            <a href="#get-status" class="nav-item">
+                <span>System Status</span>
+                <span class="method-badge method-get">GET</span>
+            </a>
+            <a href="#api-detect" class="nav-item">
+                <span>Face Detection</span>
+                <span class="method-badge method-post">POST</span>
+            </a>
+            <a href="#api-register" class="nav-item">
+                <span>Register Face</span>
+                <span class="method-badge method-post">POST</span>
+            </a>
+            <a href="#api-recognize" class="nav-item">
+                <span>Recognize Face</span>
+                <span class="method-badge method-post">POST</span>
+            </a>
+            <a href="#api-delete" class="nav-item">
+                <span>Delete Profile</span>
+                <span class="method-badge method-post">POST</span>
+            </a>
+        </div>
+        
+        <div class="nav-group" style="padding-top:1rem; border-top:1px solid var(--border-color); margin-top:1rem;">
+            <span class="nav-label">Security</span>
+            <div style="padding:0 0.75rem;">
+                <label style="font-size:0.7rem; color:var(--text-secondary); display:block; margin-bottom:0.25rem;">API Authentication Key</label>
+                <input type="password" id="api-key-input" placeholder="Enter X-API-Key" style="width:100%; padding:0.4rem 0.6rem; background:rgba(17, 24, 39, 0.6); border:1px solid var(--border-color); border-radius:6px; color:#ffffff; font-size:0.75rem; outline:none; box-sizing:border-box;">
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Panel -->
+    <main>
+        
+        <!-- Getting Started -->
+        <section id="intro">
+            <div class="section-header">
+                <h1 class="section-title">Getting Started</h1>
+            </div>
+            <p class="section-desc">
+                Welcome to the high-performance <strong>Face Recognition DNN API Documentation</strong>. This service handles CNN-based face detection (via <strong>YuNet</strong>) and deep learning face embedding matching (via <strong>SFace</strong>) using OpenCV's optimized C++ neural network backend.
+            </p>
+            <div class="info-box">
+                <strong>Base URL:</strong> <code>http://localhost:5000</code><br>
+                The API runs locally inside a Docker container. CORS is enabled dynamically to accept requests from your CodeIgniter site (e.g. <code>http://localhost:8080</code>).
+            </div>
+        </section>
+
+
+        <!-- GET /status -->
+        <section id="get-status">
+            <div class="section-header">
+                <h2 class="section-title">System Status</h2>
+                <span class="method-badge method-get">GET</span>
+            </div>
+            <p class="section-desc">Checks backend service health, database status, and loads registered student profile counts.</p>
+            
+            <div class="endpoint-bar">
+                <span class="endpoint-host">GET</span>
+                <span class="endpoint-path">/status</span>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Response (200 OK)</div>
+                <pre><code class="json">{
+  "status": "online",
+  "model_trained": true,
+  "registered_users": {
+    "101": {
+      "name": "Budi",
+      "created_at": "2026-07-20 09:25:00"
+    }
+  }
+}</code></pre>
+            </div>
+        </section>
+
+        <!-- POST /api/detect -->
+        <section id="api-detect">
+            <div class="section-header">
+                <h2 class="section-title">Face Detection (YuNet)</h2>
+                <span class="method-badge method-post">POST</span>
+            </div>
+            <p class="section-desc">Detects coordinates of faces in a given frame. Returns box bounding coordinates.</p>
+            
+            <div class="endpoint-bar">
+                <span class="endpoint-host">POST</span>
+                <span class="endpoint-path">/api/detect</span>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Request Body</div>
+                <table class="params-table">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Type</th>
+                            <th>Requirement</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="param-name">frame</td>
+                            <td class="param-type">string</td>
+                            <td><span class="param-req">REQUIRED</span></td>
+                            <td>Base64-encoded image data URL (JPEG/PNG).</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Playground -->
+            <div class="card">
+                <div class="card-header">Interactive Test Portal</div>
+                <div class="playground-grid">
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-secondary);">Base64 JSON Payload</label>
+                        <textarea id="detect-payload" class="play-input">{"frame": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ..."}</textarea>
+                        <button class="btn" onclick="testEndpoint('detect')" style="margin-top:0.75rem;">Execute Request</button>
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-secondary);">Response JSON</label>
+                        <div id="detect-output" class="play-output-container">Click Execute to view response.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- POST /api/register -->
+        <section id="api-register">
+            <div class="section-header">
+                <h2 class="section-title">Register Student Face</h2>
+                <span class="method-badge method-post">POST</span>
+            </div>
+            <p class="section-desc">Crops the face, aligns it via CNN landmarks, extracts a 128-dim vector embedding, and saves it in SQLite.</p>
+            
+            <div class="endpoint-bar">
+                <span class="endpoint-host">POST</span>
+                <span class="endpoint-path">/api/register</span>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Request Body</div>
+                <table class="params-table">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Type</th>
+                            <th>Requirement</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="param-name">label_id</td>
+                            <td class="param-type">integer</td>
+                            <td><span class="param-req">REQUIRED</span></td>
+                            <td>Unique numeric ID of the student.</td>
+                        </tr>
+                        <tr>
+                            <td class="param-name">username</td>
+                            <td class="param-type">string</td>
+                            <td><span class="param-req">REQUIRED</span></td>
+                            <td>Name of the student.</td>
+                        </tr>
+                        <tr>
+                            <td class="param-name">frame</td>
+                            <td class="param-type">string</td>
+                            <td><span class="param-req">REQUIRED</span></td>
+                            <td>Base64-encoded image data URL.</td>
+                        </tr>
+                        <tr>
+                            <td class="param-name">target_pose</td>
+                            <td class="param-type">string</td>
+                            <td><span>OPTIONAL</span></td>
+                            <td>
+                                Pose target for biometric verification. Options: <code>front</code>, <code>left</code>, <code>right</code>, <code>any</code>.<br>
+                                <span style="font-size:0.75rem; color:var(--text-secondary); display:block; margin-top:0.25rem;">
+                                    * Defaults to <code>front</code> if omitted.<br>
+                                    * Pass <code>any</code> to **bypass pose verification checks entirely** (e.g. for simple single-photo registrations or legacy devices).<br>
+                                    * If only <code>front</code> is registered, face recognition will succeed for front-facing angles but may have reduced accuracy at extreme side angles.
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Code Examples</div>
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" onclick="selectTab(this, 'curl')">cURL</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'js')">JavaScript</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'php')">PHP</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'python')">Python</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'go')">Go</button>
+                    </div>
+                    <div class="tabs-content">
+                        <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+                        <pre class="tab-pane active" data-lang="curl"><code>curl -X POST http://localhost:5000/api/register \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY_HERE" \
+  -d '{
+    "label_id": 101,
+    "username": "Budi",
+    "frame": "data:image/jpeg;base64,/9j/4...",
+    "target_pose": "front"
+  }'</code></pre>
+                        <pre class="tab-pane" data-lang="js"><code>const response = await fetch('http://localhost:5000/api/register', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': 'YOUR_API_KEY_HERE'
+    },
+    body: JSON.stringify({
+        label_id: 101,
+        username: "Budi",
+        frame: "data:image/jpeg;base64,/9j/4...",
+        target_pose: "front"
+    })
+});
+const result = await response.json();
+console.log(result);</code></pre>
+                        <pre class="tab-pane" data-lang="php"><code>$client = new \\GuzzleHttp\\Client();
+$response = $client-&gt;post('http://localhost:5000/api/register', [
+    'headers' =&gt; [
+        'X-API-Key' =&gt; 'YOUR_API_KEY_HERE'
+    ],
+    'json' =&gt; [
+        'label_id' =&gt; 101,
+        'username' =&gt; 'Budi',
+        'frame' =&gt; 'data:image/jpeg;base64,/9j/4...',
+        'target_pose' =&gt; 'front'
+    ]
+]);
+$result = json_decode($response-&gt;getBody(), true);
+print_r($result);</code></pre>
+                        <pre class="tab-pane" data-lang="python"><code>import requests
+
+url = "http://localhost:5000/api/register"
+headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY_HERE"
+}
+payload = {
+    "label_id": 101,
+    "username": "Budi",
+    "frame": "data:image/jpeg;base64,/9j/4...",
+    "target_pose": "front"
+}
+response = requests.post(url, json=payload, headers=headers)
+print(response.json())</code></pre>
+                        <pre class="tab-pane" data-lang="go"><code>package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	url := "http://localhost:5000/api/register"
+	payload := map[string]interface{}{
+		"label_id": 101,
+		"username": "Budi",
+		"frame":    "data:image/jpeg;base64,/9j/4...",
+		"target_pose": "front",
+	}
+	jsonVal, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonVal))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", "YOUR_API_KEY_HERE")
+
+	client := &http.Client{}
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()
+
+	fmt.Println("Response Status:", resp.Status)
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Response Scenarios</div>
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" onclick="selectTab(this, 'res-success')">Success (200)</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'res-pose')">Pose Mismatch (200)</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'res-quality')">Poor Quality (200)</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'res-dup')">Duplicate Face (200)</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'res-err')">Bad Request (400)</button>
+                    </div>
+                    <div class="tabs-content">
+                        <pre class="tab-pane active" data-lang="res-success"><code class="json">{
+  "status": "success",
+  "message": "Saved face vector for 'Budi'",
+  "box": { "x": 120, "y": 80, "w": 150, "h": 150 }
+}</code></pre>
+                        <pre class="tab-pane" data-lang="res-pose"><code class="json">{
+  "status": "pose_mismatch",
+  "message": "Please turn your head slightly to the left."
+}</code></pre>
+                        <pre class="tab-pane" data-lang="res-quality"><code class="json">{
+  "status": "poor_quality",
+  "message": "Poor face quality detected (65.2%). Please adjust lighting or position."
+}</code></pre>
+                        <pre class="tab-pane" data-lang="res-dup"><code class="json">{
+  "status": "duplicate_detected",
+  "message": "Face is already registered under name 'Budi' (ID: 101)",
+  "matched_id": 101,
+  "matched_name": "Budi"
+}</code></pre>
+                        <pre class="tab-pane" data-lang="res-err"><code class="json">{
+  "error": "Missing frame, label_id, or username parameters"
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- POST /api/recognize -->
+        <section id="api-recognize">
+            <div class="section-header">
+                <h2 class="section-title">Recognize Face</h2>
+                <span class="method-badge method-post">POST</span>
+            </div>
+            <p class="section-desc">Runs face detection, aligns detected faces, extracts features, and matches them using Cosine Similarity.</p>
+            
+            <div class="endpoint-bar">
+                <span class="endpoint-host">POST</span>
+                <span class="endpoint-path">/api/recognize</span>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Request Body</div>
+                <table class="params-table">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Type</th>
+                            <th>Requirement</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="param-name">frame</td>
+                            <td class="param-type">string</td>
+                            <td><span class="param-req">REQUIRED</span></td>
+                            <td>Base64-encoded image data URL.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Code Examples</div>
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" onclick="selectTab(this, 'curl')">cURL</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'js')">JavaScript</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'php')">PHP</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'python')">Python</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'go')">Go</button>
+                    </div>
+                    <div class="tabs-content">
+                        <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+                        <pre class="tab-pane active" data-lang="curl"><code>curl -X POST http://localhost:5000/api/recognize \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY_HERE" \
+  -d '{
+    "frame": "data:image/jpeg;base64,/9j/4..."
+  }'</code></pre>
+                        <pre class="tab-pane" data-lang="js"><code>const response = await fetch('http://localhost:5000/api/recognize', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': 'YOUR_API_KEY_HERE'
+    },
+    body: JSON.stringify({
+        frame: "data:image/jpeg;base64,/9j/4..."
+    })
+});
+const result = await response.json();
+console.log(result);</code></pre>
+                        <pre class="tab-pane" data-lang="php"><code>$client = new \\GuzzleHttp\\Client();
+$response = $client-&gt;post('http://localhost:5000/api/recognize', [
+    'headers' =&gt; [
+        'X-API-Key' =&gt; 'YOUR_API_KEY_HERE'
+    ],
+    'json' =&gt; [
+        'frame' =&gt; 'data:image/jpeg;base64,/9j/4...'
+    ]
+]);
+$result = json_decode($response-&gt;getBody(), true);
+print_r($result);</code></pre>
+                        <pre class="tab-pane" data-lang="python"><code>import requests
+
+url = "http://localhost:5000/api/recognize"
+headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY_HERE"
+}
+payload = {
+    "frame": "data:image/jpeg;base64,/9j/4..."
+}
+response = requests.post(url, json=payload, headers=headers)
+print(response.json())</code></pre>
+                        <pre class="tab-pane" data-lang="go"><code>package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	url := "http://localhost:5000/api/recognize"
+	payload := map[string]interface{}{
+		"frame": "data:image/jpeg;base64,/9j/4...",
+	}
+	jsonVal, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonVal))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", "YOUR_API_KEY_HERE")
+
+	client := &http.Client{}
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()
+
+	fmt.Println("Response Status:", resp.Status)
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Response Scenarios</div>
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" onclick="selectTab(this, 'res-matched')">Match Found (200)</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'res-unknown')">Unknown Face (200)</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'res-noface')">No Face (200)</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'res-rec-err')">Bad Request (400)</button>
+                    </div>
+                    <div class="tabs-content">
+                        <pre class="tab-pane active" data-lang="res-matched"><code class="json">{
+  "faces": [
+    {
+      "x": 120,
+      "y": 80,
+      "w": 150,
+      "h": 150,
+      "label_id": 101,
+      "name": "Budi",
+      "confidence": 0.724
+    }
+  ]
+}</code></pre>
+                        <pre class="tab-pane" data-lang="res-unknown"><code class="json">{
+  "faces": [
+    {
+      "x": 120,
+      "y": 80,
+      "w": 150,
+      "h": 150,
+      "label_id": -1,
+      "name": "Unknown",
+      "confidence": 0.0
+    }
+  ]
+}</code></pre>
+                        <pre class="tab-pane" data-lang="res-noface"><code class="json">{
+  "faces": []
+}</code></pre>
+                        <pre class="tab-pane" data-lang="res-rec-err"><code class="json">{
+  "error": "Missing frame parameter"
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- POST /api/delete -->
+        <section id="api-delete">
+            <div class="section-header">
+                <h2 class="section-title">Delete Student Profile</h2>
+                <span class="method-badge method-post">POST</span>
+            </div>
+            <p class="section-desc">Deletes the profile and all associated vector embeddings from the SQLite database.</p>
+            
+            <div class="endpoint-bar">
+                <span class="endpoint-host">POST</span>
+                <span class="endpoint-path">/api/delete</span>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Request Body</div>
+                <table class="params-table">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Type</th>
+                            <th>Requirement</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="param-name">label_id</td>
+                            <td class="param-type">integer</td>
+                            <td><span class="param-req">REQUIRED</span></td>
+                            <td>The unique label ID to delete.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Code Examples</div>
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" onclick="selectTab(this, 'curl')">cURL</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'js')">JavaScript</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'php')">PHP</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'python')">Python</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'go')">Go</button>
+                    </div>
+                    <div class="tabs-content">
+                        <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+                        <pre class="tab-pane active" data-lang="curl"><code>curl -X POST http://localhost:5000/api/delete \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY_HERE" \
+  -d '{
+    "label_id": 101
+  }'</code></pre>
+                        <pre class="tab-pane" data-lang="js"><code>const response = await fetch('http://localhost:5000/api/delete', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': 'YOUR_API_KEY_HERE'
+    },
+    body: JSON.stringify({
+        label_id: 101
+    })
+});
+const result = await response.json();
+console.log(result);</code></pre>
+                        <pre class="tab-pane" data-lang="php"><code>$client = new \\GuzzleHttp\\Client();
+$response = $client-&gt;post('http://localhost:5000/api/delete', [
+    'headers' =&gt; [
+        'X-API-Key' =&gt; 'YOUR_API_KEY_HERE'
+    ],
+    'json' =&gt; [
+        'label_id' =&gt; 101
+    ]
+]);
+$result = json_decode($response-&gt;getBody(), true);
+print_r($result);</code></pre>
+                        <pre class="tab-pane" data-lang="python"><code>import requests
+
+url = "http://localhost:5000/api/delete"
+headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY_HERE"
+}
+payload = {
+    "label_id": 101
+}
+response = requests.post(url, json=payload, headers=headers)
+print(response.json())</code></pre>
+                        <pre class="tab-pane" data-lang="go"><code>package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	url := "http://localhost:5000/api/delete"
+	payload := map[string]interface{}{
+		"label_id": 101,
+	}
+	jsonVal, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonVal))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", "YOUR_API_KEY_HERE")
+
+	client := &http.Client{}
+	resp, _ := client.Do(req)
+	defer resp.Body.Close()
+
+	fmt.Println("Response Status:", resp.Status)
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Response Scenarios</div>
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" onclick="selectTab(this, 'res-del-success')">Success (200)</button>
+                        <button class="tab-btn" onclick="selectTab(this, 'res-del-err')">Bad Request (400)</button>
+                    </div>
+                    <div class="tabs-content">
+                        <pre class="tab-pane active" data-lang="res-del-success"><code class="json">{
+  "status": "success",
+  "message": "Deleted user ID 101"
+}</code></pre>
+                        <pre class="tab-pane" data-lang="res-del-err"><code class="json">{
+  "error": "label_id must be an integer"
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Tab switching logic for code examples
+        function selectTab(buttonElement, lang) {
+            const container = buttonElement.closest('.tabs-container');
+            const buttons = container.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            buttonElement.classList.add('active');
+            
+            const panes = container.querySelectorAll('.tab-pane');
+            panes.forEach(pane => {
+                if (pane.getAttribute('data-lang') === lang) {
+                    pane.classList.add('active');
+                } else {
+                    pane.classList.remove('active');
+                }
+            });
+        }
+
+        // Smart Copy button function with visual feedback
+        function copySnippet(buttonElement) {
+            const container = buttonElement.closest('.tabs-container');
+            const activePane = container.querySelector('.tab-pane.active code');
+            if (!activePane) return;
+            
+            const codeText = activePane.innerText;
+            navigator.clipboard.writeText(codeText).then(() => {
+                const origText = buttonElement.innerText;
+                buttonElement.innerText = "Copied!";
+                buttonElement.style.backgroundColor = "var(--accent-teal)";
+                buttonElement.style.color = "#ffffff";
+                setTimeout(() => {
+                    buttonElement.innerText = origText;
+                    buttonElement.style.backgroundColor = "";
+                    buttonElement.style.color = "";
+                }, 1500);
+            });
+        }
+
+        // Interactive Playground API test execution
+        async function testEndpoint(type) {
+            const outputElement = document.getElementById(`${type}-output`);
+            const payload = document.getElementById(`${type}-payload`).value;
+            
+            outputElement.innerHTML = "Sending request to server...";
+            
+            try {
+                let parsedPayload;
+                try {
+                    parsedPayload = JSON.parse(payload);
+                } catch (e) {
+                    throw new Error("Invalid JSON input schema.");
+                }
+                
+                const apiKey = document.getElementById('api-key-input').value;
+                const headers = { 'Content-Type': 'application/json' };
+                if (apiKey) {
+                    headers['X-API-Key'] = apiKey;
+                }
+                const res = await fetch(`${window.location.origin}/api/${type}`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(parsedPayload)
+                });
+                
+                const data = await res.json();
+                outputElement.innerHTML = JSON.stringify(data, null, 2);
+            } catch (err) {
+                outputElement.innerHTML = `<span style="color:var(--accent-red)">Error: ${err.message}</span>`;
+            }
+        }
+
+        // Simple scroll highlighting for navigation menu
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('section');
+            const navItems = document.querySelectorAll('.nav-item');
+            
+            let current = "";
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+            
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href').includes(current)) {
+                    item.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

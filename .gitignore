@@ -1,0 +1,42 @@
+# ==============================================================================
+# Git Ignore Rules - Face Recognition API Project
+# ==============================================================================
+
+# 1. Byte-compiled / optimized / DLL files (Python)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# 2. Local Databases & Biometric Data
+# SQLite databases must not be committed to source control.
+data/*.db
+data/*.db-journal
+data/test_profiles.db
+
+# 3. Model Weight Files (Large ONNX models)
+data/*.onnx
+data/yunet.onnx
+data/face_recognition_sface_2021dec.onnx
+
+# 4. Local Dataset Uploads
+# Raw photos uploaded by users should stay local on the host/volume.
+dataset/*
+!dataset/.gitkeep
+
+# 5. Environment Configurations (Security Sensitive)
+.env
+.env.local
+
+# 6. Virtual Environments (Python dependencies)
+.venv/
+venv/
+ENV/
+env/
+
+# 7. IDE & Text Editor Cache
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
