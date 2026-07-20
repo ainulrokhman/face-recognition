@@ -9,7 +9,7 @@ from detector import YuNetDetector
 from recognizer import SFRecognizer
 
 # Initialize Flask application
-app = Flask(__name__, static_folder="static")
+app = Flask(__name__, static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static")))
 
 # Initialize SQLite database schema
 storage.init_db()
